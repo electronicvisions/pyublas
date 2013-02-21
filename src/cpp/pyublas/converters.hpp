@@ -1,0 +1,6 @@
+#ifndef _AFAYFYDASDFAH_PYUBLAS_HEADER_SEEN_CONVERTERS_HPP
+#define _AFAYFYDASDFAH_PYUBLAS_HEADER_SEEN_CONVERTERS_HPP
+
+void pyublas_expose_converters();
+
+#endif

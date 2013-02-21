@@ -1,4 +1,4 @@
-//
+//:q
 // Copyright (c) 2008 Andreas Kloeckner
 //
 // Permission to use, copy, modify, distribute and sell this software
@@ -22,6 +22,10 @@
 #ifdef _MSC_VER
 #pragma warning( push )
 #pragma warning( disable : 4355 ) // 'this' : used in initializer list
+#elif __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wignored-qualifiers"
+//#pragma GCC diagnostic ignored "-Wnarrowing"
 #endif
 
 #include <cstdlib>
@@ -56,7 +60,7 @@ namespace
 
     pyublas_array_importer()
     {
-      if (!do_import_array())
+	  if(Py_IsInitialized() && !do_import_array())
         throw std::runtime_error("numpy failed to initialize");
     }
   } _array_importer;
@@ -1243,9 +1247,10 @@ namespace boost { namespace numeric { namespace bindings { namespace traits {
 #endif
 
 
-
 #ifdef _MSC_VER
 #pragma warning( pop )
+#elif __GNUC__
+#pragma GCC diagnostic pop
 #endif
 
 #endif
