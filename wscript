@@ -33,6 +33,7 @@ def build(bld):
             'src/wrapper/converters.cpp',
     #        'src/wrapper/sparse_build.cpp',
     #        'src/wrapper/sparse_execute.cpp',
+            'src/module/pyublas_module.cpp',
         ]
 
     bld(
@@ -42,10 +43,9 @@ def build(bld):
 
     bld(
             target          = 'pyublas',
-            features        = 'cxx cxxshlib pyembed',
+            features        = 'cxx cxxshlib pyembed pyext',
             source          = sources,
             use             = USES,
             install_path    = 'lib',
             **flags
     )
-
