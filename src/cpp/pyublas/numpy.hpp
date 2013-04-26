@@ -170,7 +170,7 @@ namespace pyublas
 
       numpy_array(size_type n)
       {
-        npy_intp dims[] = { n };
+        npy_intp dims[] = { static_cast<npy_intp>(n) };
         m_numpy_array = boost::python::handle<>(
             PyArray_SimpleNew(1, dims, get_typenum(T())));
       }
@@ -539,7 +539,7 @@ namespace pyublas
     typedef numpy_matrix<T, L> mat_type;
     boost::python::handle<> orig_handle = mat.data().handle();
 
-    npy_intp dims[] = { mat.size1(), mat.size2() };
+    npy_intp dims[] = { static_cast<npy_intp>(mat.size1()), static_cast<npy_intp>(mat.size2()) };
     boost::python::handle<> result;
 
     if (is_row_major(typename mat_type::orientation_category()))
