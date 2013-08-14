@@ -27,8 +27,6 @@ def build(bld):
               "linkflags" : ['-Wl,-z,defs'],
     }
 
-    USES = ['PYUBLAS_BOOST', 'pyublas_inc']
-
     sources = [
             'src/wrapper/converters.cpp',
     #        'src/wrapper/sparse_build.cpp',
@@ -38,14 +36,16 @@ def build(bld):
 
     bld(
             target  = 'pyublas_inc',
-            export_includes = ['src/cpp'] + get_numpy_include_dirs(),
-    )
+            export_includes = ['src/cpp'] + \
+                    get_numpy_include_dirs() + \
+                    bld.env.INCLUDES_PYEMBED,
+            use = ['PYUBLAS_BOOST'])
 
     bld(
             target          = 'pyublas',
             features        = 'cxx cxxshlib pyembed pyext',
             source          = sources,
-            use             = USES,
+            use             = ['pyublas_inc'],
             install_path    = 'lib',
             **flags
     )
