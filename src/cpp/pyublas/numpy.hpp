@@ -494,7 +494,6 @@ namespace pyublas
   template <class OCat, class T>
   typename numpy_array<T>::size_type get_array_size1(numpy_array<T> const &ary)
   {
-    typedef numpy_array<T> mat_type;
 
     if (PyArray_NDIM(ary.handle().get()) != 2)
       throw std::runtime_error("ndarray->matrix converteee has dimension != 2");
