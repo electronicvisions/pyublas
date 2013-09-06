@@ -36,7 +36,7 @@ def build(bld):
 
     bld(
             target  = 'pyublas_inc',
-            export_includes = ['src/cpp'] + \
+            export_includes = ['pyublas/include'] + \
                     get_numpy_include_dirs() + \
                     bld.env.INCLUDES_PYEMBED,
             use = ['PYUBLAS_BOOST'])
