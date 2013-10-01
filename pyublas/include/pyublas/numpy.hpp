@@ -41,12 +41,34 @@
 #include <boost/python.hpp>
 #include <boost/python.hpp>
 #include <boost/foreach.hpp>
-#include <numpy/arrayobject.h>
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/iterator/iterator_categories.hpp>
 #include <boost/range.hpp>
 #include <boost/utility/enable_if.hpp>
 #include <boost/type_traits/is_class.hpp>
+
+#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
+#include <numpy/arrayobject.h>
+
+#if NPY_FEATURE_VERSION < 0x00000007
+
+#define NPY_ARRAY_ALIGNED       NPY_ALIGNED
+#define NPY_ARRAY_NOTSWAPPED    NPY_NOTSWAPPED
+#define NPY_ARRAY_C_CONTIGUOUS  NPY_C_CONTIGUOUS
+#define NPY_ARRAY_F_CONTIGUOUS  NPY_F_CONTIGUOUS
+#define NPY_ARRAY_CARRAY        NPY_CARRAY
+#define NPY_ARRAY_FARRAY        NPY_FARRAY
+
+namespace
+{
+  inline int PyArray_SetBaseObject(PyArrayObject * obj, PyObject * base)
+  {
+    PyArray_BASE(obj) = base;
+    return 0;
+  }
+}
+
+#endif
 
 namespace
 {
@@ -99,9 +121,25 @@ namespace pyublas
   inline NPY_TYPES get_typenum(boost::python::handle<>) { return NPY_OBJECT; }
   /* NPY_STRING, NPY_UNICODE unsupported for now */
 
+  typedef ::PyArrayObject PyArrayObject;
+
+  inline PyArrayObject * toPyArrayObject(boost::python::handle<> & obj) {
+    if (obj.get() && PyArray_Check(obj.get()))
+      return reinterpret_cast<PyArrayObject *>(obj.get());
+    else
+      return 0;
+  }
+
+  inline const PyArrayObject * toPyArrayObject(const boost::python::handle<> & obj) {
+    if (obj.get() && PyArray_Check(obj.get()))
+      return reinterpret_cast<const PyArrayObject *>(obj.get());
+    else
+      return 0;
+  }
+
   template <class T>
   inline
-  bool is_storage_compatible(PyObject *ary)
+  bool is_storage_compatible(const PyArrayObject *ary)
   {
     /* This piece of code works around the fact that 'int' and
      * 'long int' are the same on 32-bit machines, which can lead
@@ -112,25 +150,25 @@ namespace pyublas
      */
 
     NPY_TYPES typenum = NPY_TYPES(PyArray_TYPE(ary));
+    size_t itemsize   = PyArray_ITEMSIZE(ary);
 
-    if (boost::is_integral<T>::value && PyArray_ISINTEGER(ary))
+    if (boost::is_integral<T>::value && PyTypeNum_ISINTEGER(typenum))
     {
-      return (sizeof(T) == PyArray_ITEMSIZE(ary)
+      return (sizeof(T) == itemsize
           && bool(boost::is_signed<T>::value)
-          == bool(PyArray_ISSIGNED(ary)));
+          == PyTypeNum_ISSIGNED(typenum));
     }
-    else if (typenum == NPY_BOOL && (
+    else if (PyTypeNum_ISBOOL(typenum) && (
           boost::is_same<T, signed char>::value ||
           boost::is_same<T, unsigned char>::value))
     {
-      return (sizeof(T) == PyArray_ITEMSIZE(ary)
+      return (sizeof(T) == itemsize
           && bool(boost::is_signed<T>::value)
-          == bool(PyArray_ISSIGNED(ary)));
+          == PyArray_ISSIGNED(ary));
     }
     else
       return typenum == get_typenum(T());
   }
-
 
 
 
@@ -228,22 +266,24 @@ namespace pyublas
           return;
         }
 
-        if (!PyArray_Check(obj.get()))
-          PYUBLAS_PYERROR(TypeError, "argument is not a numpy array");
-        if (!is_storage_compatible<T>(obj.get()))
-          PYUBLAS_PYERROR(TypeError, "argument is numpy array of wrong type");
-        if (!PyArray_CHKFLAGS(obj.get(), NPY_ALIGNED))
+        if (const PyArrayObject * array = toPyArrayObject(obj))
+        {
+          if (!PyArray_Check(array))
+            PYUBLAS_PYERROR(TypeError, "argument is not a numpy array");
+          if (!is_storage_compatible<T>(array))
+            PYUBLAS_PYERROR(TypeError, "argument is numpy array of wrong type");
+          if (!PyArray_CHKFLAGS(array, NPY_ARRAY_ALIGNED))
             PYUBLAS_PYERROR(ValueError, "argument array is not aligned");
-        if (PyArray_CHKFLAGS(obj.get(), NPY_NOTSWAPPED))
+          if (PyArray_CHKFLAGS(array, NPY_ARRAY_NOTSWAPPED))
             PYUBLAS_PYERROR(ValueError, "argument array does not have native endianness");
-        if (PyArray_ITEMSIZE(obj.get()) != sizeof(T))
+          if (PyArray_ITEMSIZE(array) != sizeof(T))
             PYUBLAS_PYERROR(ValueError, "itemsize does not match size of target type");
+        }
       }
 
       numpy_array copy() const
       {
-        boost::python::handle<> cp(PyArray_NewCopy(
-              reinterpret_cast<PyArrayObject *>(m_numpy_array.get()), NPY_ANYORDER));
+        boost::python::handle<> cp(PyArray_NewCopy(get_array()), NPY_ANYORDER);
         return numpy_array(cp);
       }
 
@@ -251,7 +291,7 @@ namespace pyublas
       void resize_internal (size_type new_size, value_type init, bool preserve = true)
       {
         size_type old_size;
-        if (m_numpy_array.get())
+        if (get_array())
           old_size = size();
         else
         {
@@ -264,8 +304,9 @@ namespace pyublas
           npy_intp dims[] = { static_cast<npy_intp>(new_size) };
           boost::python::handle<> new_array = boost::python::handle<>(
               PyArray_SimpleNew(1, dims, get_typenum(T())));
-          pointer new_data = reinterpret_cast<T *>(
-              PyArray_DATA(new_array.get()));
+          PyArrayObject * new_array_ptr = toPyArrayObject(new_array);
+
+          pointer new_data = reinterpret_cast<T *>(PyArray_DATA(new_array_ptr));
 
           if (preserve)
           {
@@ -302,22 +343,22 @@ namespace pyublas
 
       // metadata
       bool is_valid() const
-      { return m_numpy_array.get(); }
+      { return get_array(); }
       size_type ndim() const
-      { return PyArray_NDIM(m_numpy_array.get()); }
+      { return PyArray_NDIM(get_array()); }
       const npy_intp *dims() const
-      { return PyArray_DIMS(m_numpy_array.get()); }
+      { return PyArray_DIMS(const_cast<numpy_array*>(this)->get_array()); }
       const npy_intp dim(npy_intp i) const
-      { return PyArray_DIM(m_numpy_array.get(), i); }
+      { return PyArray_DIM(get_array(), i); }
       const npy_intp *strides() const
-      { return PyArray_STRIDES(m_numpy_array.get()); }
+      { return PyArray_STRIDES(const_cast<numpy_array*>(this)->get_array()); }
       const npy_intp stride(npy_intp i) const
-      { return PyArray_STRIDE(m_numpy_array.get(), i); }
+      { return PyArray_STRIDE(get_array(), i); }
 
       npy_intp itemsize() const
       { return sizeof(T); }
       bool writable() const
-      { return PyArray_ISWRITEABLE(m_numpy_array.get()); }
+      { return PyArray_ISWRITEABLE(get_array()); }
 
       // shape manipulation
       void reshape(int ndim_, const npy_intp *dims_,
@@ -326,20 +367,20 @@ namespace pyublas
         PyArray_Dims d = { const_cast<npy_intp *>(dims_), ndim_ };
         m_numpy_array = boost::python::handle<>(
             PyArray_Newshape(
-              (PyArrayObject *) m_numpy_array.get(), &d, order));
+              (PyArrayObject *) get_array(), &d, order));
       }
 
       // Raw data access
       T *data()
       {
         return reinterpret_cast<T *>(
-            PyArray_DATA(m_numpy_array.get()));
+            PyArray_DATA(get_array()));
       }
 
       const T *data() const
       {
         return reinterpret_cast<const T *>(
-            PyArray_DATA(m_numpy_array.get()));
+            PyArray_DATA(const_cast<numpy_array*>(this)->get_array()));
       }
 
       // Element access
@@ -476,6 +517,14 @@ namespace pyublas
       {
         return handle();
       }
+
+    PyArrayObject * get_array()  {
+      return toPyArrayObject(m_numpy_array);
+    }
+
+    const PyArrayObject * get_array() const {
+      return toPyArrayObject(m_numpy_array);
+    }
   };
 
 
@@ -495,38 +544,41 @@ namespace pyublas
   typename numpy_array<T>::size_type get_array_size1(numpy_array<T> const &ary)
   {
 
-    if (PyArray_NDIM(ary.handle().get()) != 2)
+    const PyArrayObject * pyarray = ary.get_array();
+
+    if (PyArray_NDIM(pyarray) != 2)
       throw std::runtime_error("ndarray->matrix converteee has dimension != 2");
 
-    if (PyArray_STRIDE(ary.handle().get(), 1)
-        == PyArray_ITEMSIZE(ary.handle().get()))
+    if (PyArray_STRIDE(pyarray, 1)
+        == PyArray_ITEMSIZE(pyarray))
     {
       // row-major
       if (!is_row_major(OCat()))
         throw std::runtime_error("input array is not row-major (like the target type)");
-      if (!PyArray_CHKFLAGS(ary.handle().get(), NPY_C_CONTIGUOUS))
+      if (!PyArray_CHKFLAGS(pyarray, NPY_ARRAY_C_CONTIGUOUS))
         throw std::runtime_error("ndarray->matrix converteee is not C-contiguous");
     }
-    else if (PyArray_STRIDE(ary.handle().get(), 0)
-        == PyArray_ITEMSIZE(ary.handle().get()))
+    else if (PyArray_STRIDE(pyarray, 0)
+        == PyArray_ITEMSIZE(pyarray))
     {
       // column-major
       if (is_row_major(OCat()))
         throw std::runtime_error("input array is not column-major (like the target type)");
-      if (!PyArray_CHKFLAGS(ary.handle().get(), NPY_F_CONTIGUOUS))
+      if (!PyArray_CHKFLAGS(pyarray, NPY_ARRAY_F_CONTIGUOUS))
         throw std::runtime_error("ndarray->matrix converteee is not F-contiguous");
     }
     else
         throw std::runtime_error("input array is does not have dimension with stride==1");
 
-    return PyArray_DIM(ary.handle().get(), 0);
+    return PyArray_DIM(pyarray, 0);
   }
 
   template <class T>
   typename numpy_array<T>::size_type get_array_size2(numpy_array<T> const &ary)
   {
     // checking is done in size1()
-    return PyArray_DIM(ary.handle().get(), 1);
+    const PyArrayObject * pyarray = ary.get_array();
+    return PyArray_DIM(pyarray, 1);
   }
 
   template<class T, class L = boost::numeric::ublas::row_major>
@@ -543,26 +595,29 @@ namespace pyublas
 
     if (is_row_major(typename mat_type::orientation_category()))
     {
+      PyArrayObject * orig_ptr = toPyArrayObject(orig_handle);
       result = boost::python::handle<>(PyArray_New(
           &PyArray_Type, 2, dims,
           get_typenum(typename mat_type::value_type()),
           /*strides*/0,
-          PyArray_DATA(orig_handle.get()),
+          PyArray_DATA(orig_ptr),
           /* ? */ 0,
-          NPY_CARRAY, NULL));
+          NPY_ARRAY_CARRAY, NULL));
     }
     else
     {
+      PyArrayObject * orig_ptr = toPyArrayObject(orig_handle);
       result = boost::python::handle<>(PyArray_New(
           &PyArray_Type, 2, dims,
           get_typenum(typename mat_type::value_type()),
           /*strides*/0,
-          PyArray_DATA(orig_handle.get()),
+          PyArray_DATA(orig_ptr),
           /* ? */ 0,
-          NPY_FARRAY, NULL));
+          NPY_ARRAY_FARRAY, NULL));
     }
 
-    PyArray_BASE(result.get()) = boost::python::handle<>(orig_handle).release();
+    PyArrayObject * result_ptr = toPyArrayObject(result);
+    PyArray_SetBaseObject(result_ptr, boost::python::handle<>(orig_handle).release());
     return result;
   }
 
