@@ -25,6 +25,7 @@
 #elif __GNUC__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wignored-qualifiers"
+#pragma GCC system_header
 //#pragma GCC diagnostic ignored "-Wnarrowing"
 #endif
 
