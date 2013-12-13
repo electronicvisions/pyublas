@@ -46,6 +46,6 @@ def build(bld):
             features        = 'cxx cxxshlib pyembed pyext',
             source          = sources,
             use             = ['pyublas_inc'],
-            install_path    = 'lib',
+            install_path    = '${PREFIX}/lib',
             **flags
     )
