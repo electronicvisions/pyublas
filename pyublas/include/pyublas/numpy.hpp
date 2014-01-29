@@ -633,99 +633,112 @@ namespace pyublas
 
   namespace detail
   {
-    template <class Derived, class Super>
+
+	template <class Derived, class Super>
     struct vector_functionality
     {
       Derived copy() const
       {
-        return Derived(static_cast<const Derived *>(this)->array());
+        return Derived(derived().array());
       }
 
       // numpy array metadata
       bool is_valid() const
-      { return static_cast<const Derived *>(this)->array().is_valid(); }
+      { return derived().array().is_valid(); }
       typename Super::size_type ndim() const
-      { return static_cast<const Derived *>(this)->array().ndim(); }
+      { return derived().array().ndim(); }
       const npy_intp *dims() const
-      { return static_cast<const Derived *>(this)->array().dims(); }
+      { return derived().array().dims(); }
       const npy_intp dim(npy_intp i) const
-      { return static_cast<const Derived *>(this)->array().dim(i); }
+      { return derived().array().dim(i); }
       const npy_intp *strides() const
-      { return static_cast<const Derived *>(this)->array().strides(); }
+      { return derived().array().strides(); }
       const npy_intp stride(npy_intp i) const
-      { return static_cast<const Derived *>(this)->array().stride(i); }
+      { return derived().array().stride(i); }
       npy_intp itemsize() const
       { return sizeof(typename Derived::value_type); }
       bool writable() const
-      { return static_cast<const Derived *>(this)->array().writable(); }
+      { return derived().array().writable(); }
 
       // several-d subscripts
       typename Super::value_type &sub(npy_intp i)
       { return *reinterpret_cast<typename Super::value_type *>(
           PyArray_GETPTR1(
-            static_cast<const Derived *>(this)->array().handle().get(),
+            derived().array().get_array(),
             i));
       }
       const typename Super::value_type &sub(npy_intp i) const
       {
         return *reinterpret_cast<const typename Super::value_type *>(
             PyArray_GETPTR1(
-              static_cast<const Derived *>(this)->data().handle().get(),
+              derived().data().get_array(),
               i));
       }
       typename Super::value_type &sub(npy_intp i, npy_intp j)
       {
         return *reinterpret_cast<typename Super::value_type *>(
             PyArray_GETPTR2(
-              static_cast<const Derived *>(this)->array().handle().get(),
+              derived().array().get_array(),
               i, j));
       }
       const typename Super::value_type &sub(npy_intp i, npy_intp j) const
       {
         return *reinterpret_cast<const typename Super::value_type *>(
             PyArray_GETPTR2(
-              static_cast<const Derived *>(this)->array().handle().get(),
+              derived().array().get_array(),
               i, j));
       }
       typename Super::value_type &sub(npy_intp i, npy_intp j, npy_intp k)
       {
         return *reinterpret_cast<typename Super::value_type *>(
             PyArray_GETPTR3(
-              static_cast<const Derived *>(this)->array().handle().get(),
+              derived().array().get_array(),
               i, j, k));
       }
       const typename Super::value_type &sub(npy_intp i, npy_intp j, npy_intp k) const
       {
         return *reinterpret_cast<const typename Super::value_type *>(
             PyArray_GETPTR3(
-              static_cast<const Derived *>(this)->array().handle().get(),
+              derived().array().get_array(),
               i, j, k));
       }
       typename Super::value_type &sub(npy_intp i, npy_intp j, npy_intp k, npy_intp l)
       {
         return *reinterpret_cast<typename Super::value_type *>(
             PyArray_GETPTR4(
-              static_cast<const Derived *>(this)->array().handle().get(),
+              derived().array().get_array(),
               i, j, k, l));
       }
       const typename Super::value_type &sub(npy_intp i, npy_intp j, npy_intp k, npy_intp l) const
       {
         return *reinterpret_cast<const typename Super::value_type *>(
           PyArray_GETPTR4(
-            static_cast<const Derived *>(this)->array().handle().get(),
+            derived().array().get_array(),
             i, j, k, l));
       }
 
       // shape manipulation
       void reshape(int ndim_, const npy_intp *dims_, NPY_ORDER order=NPY_CORDER)
       {
-        static_cast<Derived *>(this)->data().reshape(ndim_, dims_, order);
+        derived().data().reshape(ndim_, dims_, order);
       }
 
       boost::python::handle<> to_python() const
       {
-        return static_cast<const Derived *>(this)->array().handle();
+        return derived().array().handle();
       }
+
+	private:
+	  Derived & derived()
+	  {
+		return *static_cast<Derived *>(this);
+	  }
+
+	  const Derived & derived() const
+	  {
+		return *static_cast<const Derived *>(this);
+	  }
+
     };
 
 
