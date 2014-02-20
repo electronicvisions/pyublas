@@ -39,13 +39,14 @@ def build(bld):
             export_includes = ['pyublas/include'] + \
                     get_numpy_include_dirs() + \
                     bld.env.INCLUDES_PYEMBED,
-            use = ['PYUBLAS_BOOST'])
+            #use = ['PYUBLAS_BOOST'] # ECM: if you use it here... it propagates through pywrap to halbe...
+    )
 
     bld(
             target          = 'pyublas',
             features        = 'cxx cxxshlib pyembed pyext',
             source          = sources,
-            use             = ['pyublas_inc'],
+            use             = ['pyublas_inc', 'PYUBLAS_BOOST'],
             install_path    = '${PREFIX}/lib',
             **flags
     )
