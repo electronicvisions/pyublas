@@ -2,12 +2,12 @@
 import sys, os
 
 def options(opt):
-    opt.load('gxx')
+    opt.load('compiler_cxx')
     opt.load('boost')
     opt.load('python')
 
 def configure(cfg):
-    cfg.load('gxx')
+    cfg.load('compiler_cxx')
     cfg.load('boost')
     cfg.load('python')
 
