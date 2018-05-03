@@ -22,10 +22,7 @@ def configure(cfg):
 
 def build(bld):
     from numpy.distutils.misc_util import get_numpy_include_dirs
-    flags = { "cxxflags"  : ['-std=c++0x', '-fPIC',
-                             '-Wall', '-Wextra', '-Wno-long-long', '-Wno-deprecated', '-Wno-format', ],
-              "linkflags" : ['-Wl,-z,defs'],
-    }
+    flags = { "linkflags" : ['-Wl,-z,defs'] }
 
     sources = [
             'src/wrapper/converters.cpp',
