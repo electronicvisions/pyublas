@@ -476,7 +476,7 @@ void pyublas_expose_converters()
   expose_converters<npy_double>();
   expose_converters<std::complex<float> >();
   expose_converters<std::complex<double> >();
-#if HAVE_LONG_DOUBLE            // defined in pyconfig.h
+#if HAVE_LONG_DOUBLE && (NPY_SIZEOF_LONGDOUBLE > NPY_SIZEOF_DOUBLE) // defined in pyconfig.h
   expose_converters<npy_longdouble>();
   expose_converters<std::complex<long double> >();
 #endif
